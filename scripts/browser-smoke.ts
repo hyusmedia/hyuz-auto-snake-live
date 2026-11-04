@@ -8,7 +8,7 @@ try{
   const page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   mkdirSync('test-results',{recursive:true});await page.goto(base+'/overlay');await page.getByText('DEMO SERVER ONLINE',{exact:true}).waitFor();
   const snapshot=async()=>page.evaluate(()=>JSON.parse(localStorage.getItem('hyuz-snake-v1')??'{}'));
-  await page.waitForTimeout(2000);const initial=await snapshot();assert(initial.game.snake.length>=4);
+  await page.waitForTimeout(2000);const initial=await snapshot();assert(initial.game.snake.length>=4);for(const selector of ['.reserved-person','.reserved-alert','.reserved-last-gift'])assert.equal(await page.locator(selector).evaluate(el=>el.childElementCount),0);const board=await page.locator('.reference-board').boundingBox();assert(board);assert(Math.abs(board.width-board.height)<1);
   await page.screenshot({path:'test-results/initial.png',fullPage:true});const admin=await context.newPage();await admin.goto(base+'/admin');await admin.getByRole('button',{name:/TEST APPLE RAIN$/}).click();await admin.getByRole('status').filter({hasText:'accepted'}).waitFor();
   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('hyuz-snake-v1')??'{}').lastGift?.includes('APPLE RAIN'));
   const gifted=await snapshot();assert(gifted.cursor>initial.cursor);

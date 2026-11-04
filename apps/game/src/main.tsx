@@ -26,19 +26,33 @@ function Game(){
   },[]);
   useEffect(()=>()=>{if(video)URL.revokeObjectURL(video);},[video]);
   const active=Object.keys(engine.active) as EffectId[];
-  return <main className="broadcast"><header><div className="brand"><span className="brand-icon">H</span><div><h1>HYUZ<span> / AUTO SNAKE</span></h1><p>THE NEVER-ENDING ARCADE</p></div></div><div className="live"><i/>LIVE GAME</div></header>
-    <div className="eyebrow"><span>SEASON 01 · NEON GARDEN</span><b>DEMO MODE</b></div>
-    <section className="scoreboard"><div><label>CURRENT SCORE</label><strong>{String(engine.score).padStart(3,'0')}</strong></div><div><label>BEST SCORE</label><strong>{String(engine.best).padStart(3,'0')}</strong></div><div><label>ROUND</label><strong>{String(engine.round).padStart(2,'0')}</strong></div></section>
-    <section className="guide"><div><span>✦</span><b>GIFTS CHANGE THE GAME</b><small>Development effects · not gift prices</small></div><ul><li>🎨 COLOR</li><li>🍎 APPLE RAIN</li><li>⚡ TURBO</li><li>💣 BOMBS</li><li>🌈 RAINBOW</li><li>🛡 SHIELD</li></ul></section>
-    <div className={'notification '+(runtime.notice?'show':'')}><span>✦</span>{runtime.notice||'AUTOPLAY IS ON · EVERY ROUND IS A NEW STORY'}</div>
-    {video&&<section className="video" style={{height:videoHeight}}><video src={video} autoPlay loop={loop} muted={muted} controls/><b>RECORDED VIDEO</b></section>}
-    <section className="arena"><div className="arena-label"><span><i/>{engine.paused||!engine.autoplay?'PAUSED':'AUTOPLAY ACTIVE'}</span><span>{engine.apples} APPLES EATEN</span></div><canvas ref={canvas} width={720} height={936} aria-label="Automatically playing neon snake game"/><div className="arena-bottom"><span>NO HANDS. JUST INSTINCT.</span><span>{engine.snake.length} SEGMENTS</span></div></section>
-    <section className="effect"><span>CURRENT EFFECT</span><strong>{active.length?active.map(id=>`${effects[id].name} ${Math.max(0,Math.ceil((engine.active[id]!-Date.now())/1000))}s`).join(' / '):'CLASSIC AUTOPLAY'}</strong></section>
-    <section className="supporter"><div className="avatar">✦</div><div><label>LAST GIFT · SIMULATED</label><p>{runtime.lastGift}</p></div><span>DEMO</span></section>
-    <div className="goal"><div><span>NEXT GOAL</span><b>{engine.score} / {Math.ceil((engine.score+1)/100)*100}</b></div><progress value={engine.score%100} max={100}/></div>
-    <footer><b>WATCH. CHEER. CHANGE THE GAME.</b><p>Independent auto-play · Mock gifts only · YouTube not connected</p><div><span className={runtime.connected?'online':'offline'}>{runtime.connected?'DEMO SERVER ONLINE':'GIFT CONNECTION OFFLINE'}</span><span>{runtime.fps} FPS</span><span>OBS STATUS: UNKNOWN</span></div>{runtime.recovery&&<p className="warning">{runtime.recovery}</p>}</footer>
-    <details className="local-settings"><summary>Local screen settings</summary><button onClick={async()=>{audio.current??=new AudioContext();await audio.current.resume();runtime.sound=audio.current.state==='running';setAudioState(runtime.sound?'SOUND ON':'SOUND BLOCKED');save();}}>{audioState}</button><label>Recorded MP4 <input type="file" accept="video/mp4" onChange={e=>{const f=e.target.files?.[0];if(f)setVideo(URL.createObjectURL(f));}}/></label><button onClick={()=>setVideo('')}>Hide video</button><label><input type="checkbox" checked={muted} onChange={e=>setMuted(e.target.checked)}/>Muted</label><label><input type="checkbox" checked={loop} onChange={e=>setLoop(e.target.checked)}/>Loop</label><label>Video height<input type="range" min="80" max="240" value={videoHeight} onChange={e=>setVideoHeight(Number(e.target.value))}/></label></details>
+  const giftGuide=[
+    {icon:'★',name:'STAR',effect:'CHANGE COLOR',detail:'SNAKE',tone:'star'},
+    {icon:'🦴',name:'TREAT',effect:'APPLE RAIN',detail:'+5 APPLES',tone:'treat'},
+    {icon:'◉',name:'GOLD',effect:'GOLDEN',detail:'APPLE',tone:'gold'},
+    {icon:'⚡',name:'BOOST',effect:'TURBO',detail:'10 SECONDS',tone:'boost'},
+    {icon:'🎉',name:'PARTY',effect:'RAINBOW',detail:'SNAKE',tone:'party'},
+    {icon:'💣',name:'BOMB',effect:'SPAWN',detail:'BOMBS',tone:'bomb'},
+    {icon:'🛡',name:'GUARD',effect:'SHIELD',detail:'10 SECONDS',tone:'shield'},
+    {icon:'☠',name:'CHAOS',effect:'GAME OVER',detail:'ROUND ONLY',tone:'chaos'}
+  ];
+  return <main className="reference-stage">
+    <section className="reserved-person" aria-label="Reserved space for person video">
+      {video&&<><video src={video} autoPlay loop={loop} muted={muted} style={{height:videoHeight}}/><small>RECORDED VIDEO</small></>}
+    </section>
+    <section className="reserved-alert" aria-label="Reserved space for gift alert"/>
+    <div className="round-badge">LEVEL {engine.round}</div>
+    <div className="gift-heading"><h1>Game play gifts:</h1><div className="apple-meter"><div style={{width:`${engine.score%100}%`}}/><span>🍎 {engine.apples} APPLES · NEXT {Math.ceil((engine.score+1)/100)*100}</span></div></div>
+    <section className="gift-strip" aria-label="Demo gift effect guide">
+      {giftGuide.map(g=><div className="gift-column" key={g.name}><div className={'gift-tile '+g.tone}><span className="gift-icon">{g.icon}</span><small>{g.name}</small><span className="demo-token">✦ DEMO</span></div><b>{g.effect}</b><em>{g.detail}</em></div>)}
+    </section>
+    <section className="reference-board"><canvas ref={canvas} width={720} height={720} aria-label="Automatically playing spotted snake game"/></section>
+    <div className="reference-score" aria-label="Current score">{engine.score}<span>=score</span></div>
+    <section className="reserved-last-gift" aria-label="Reserved space for last gift sender"/>
+    <div className="minimal-status"><span>HYUZ · DEMO · AUTOPLAY {engine.paused||!engine.autoplay?'PAUSED':'ON'}</span><span className={runtime.connected?'online':'offline'}>{runtime.connected?'DEMO SERVER ONLINE':'GIFT CONNECTION OFFLINE'}</span><span>{runtime.fps} FPS{active.length?' · '+active.map(id=>effects[id].name).join(' / '):''}</span>{runtime.recovery&&<span className="warning">{runtime.recovery}</span>}</div>
+    {location.pathname!=='/overlay'&&<details className="screen-options"><summary>Screen settings</summary><button onClick={async()=>{audio.current??=new AudioContext();await audio.current.resume();runtime.sound=audio.current.state==='running';setAudioState(runtime.sound?'SOUND ON':'SOUND BLOCKED');save();}}>{audioState}</button><label>Recorded MP4<input type="file" accept="video/mp4" onChange={e=>{const f=e.target.files?.[0];if(f)setVideo(URL.createObjectURL(f));}}/></label><button onClick={()=>setVideo('')}>Clear person area</button><label><input type="checkbox" checked={muted} onChange={e=>setMuted(e.target.checked)}/>Muted</label><label><input type="checkbox" checked={loop} onChange={e=>setLoop(e.target.checked)}/>Loop</label><label>Video height<input type="range" min="80" max="150" value={videoHeight} onChange={e=>setVideoHeight(Number(e.target.value))}/></label></details>}
   </main>;
+
 }
 type Status={pending:number;total:number;uptime:number;youtube:string;journal:{seq:number;effect:EffectId;count:number;event:{username:string;source:string}}[];errorCount:number;lastError:string;names:Record<string,EffectId>};
 function Admin(){
@@ -56,7 +70,7 @@ function Admin(){
 }
 function GameScreen(){
   const ref=useRef<HTMLDivElement>(null);const [fit,setFit]=useState({scale:1,top:0});
-  useEffect(()=>{const update=()=>{if(!ref.current)return;const height=ref.current.scrollHeight,scale=Math.min(innerWidth/608,innerHeight/height);setFit({scale,top:Math.max(0,(innerHeight-height*scale)/2)});};const observer=new ResizeObserver(update);if(ref.current)observer.observe(ref.current);window.addEventListener('resize',update);update();return()=>{observer.disconnect();window.removeEventListener('resize',update);};},[]);
+  useEffect(()=>{const update=()=>{if(!ref.current)return;const height=1920,scale=Math.min(innerWidth/1080,innerHeight/height);setFit({scale,top:Math.max(0,(innerHeight-height*scale)/2)});};const observer=new ResizeObserver(update);if(ref.current)observer.observe(ref.current);window.addEventListener('resize',update);update();return()=>{observer.disconnect();window.removeEventListener('resize',update);};},[]);
   return <div className="screen"><div className="fit-screen" ref={ref} style={{transform:`translateX(-50%) scale(${fit.scale})`,top:fit.top}}><Game/></div></div>;
 }
 createRoot(document.getElementById('root')!).render(location.pathname==='/admin'?<Admin/>:<GameScreen/>);
