@@ -101,7 +101,7 @@ npm run test:soak
 
 ## GitHub 및 문제 해결
 
-프로젝트는 독립 Git 저장소로 준비됩니다. 원격 업로드는 수행하지 않았습니다. 변경 검토 후 본인의 새 저장소에 연결할 수 있습니다.
+프로젝트 저장소는 https://github.com/hyusmedia/hyuz-auto-snake-live 입니다. GitHub의 Code → Download ZIP으로 소스를 받을 수 있습니다. 아래 명령은 다른 새 저장소에 올릴 때의 예시입니다.
 
 ```powershell
 git init -b main
