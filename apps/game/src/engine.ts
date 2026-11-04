@@ -11,8 +11,9 @@ export class Engine {
   score=0;best=0;round=0;apples=0;growth=0;color='#8dff5e';
   now=0;restartAt=0;reason='';paused=false;autoplay=true;speed=8;difficulty='normal';
   active:Partial<Record<EffectId,number>>={};pending:EffectId[]=[];lastEat=-10000;lastExplosion=-10000;
+  movesSinceTurn=0;turnAfter=3;movesWithoutApple=0;recent:number[]=[];
   constructor(public random:()=>number=Math.random){this.reset();}
-  reset(){this.round++;this.snake=[{x:5,y:13},{x:4,y:13},{x:3,y:13},{x:2,y:13}];this.previous=this.snake.map(p=>({...p}));this.food=[];this.bombs=[];this.score=0;this.apples=0;this.growth=0;this.active={};this.pending=[];this.restartAt=0;this.spawnApples(1);}
+  reset(){this.round++;this.snake=[{x:5,y:13},{x:4,y:13},{x:3,y:13},{x:2,y:13}];this.previous=this.snake.map(p=>({...p}));this.food=[];this.bombs=[];this.score=0;this.apples=0;this.growth=0;this.active={};this.pending=[];this.restartAt=0;this.movesSinceTurn=0;this.turnAfter=2+Math.floor(this.random()*4);this.movesWithoutApple=0;this.recent=[];this.spawnApples(1);}
   free():Cell|undefined {
     const occupied=new Set([...this.snake,...this.food,...this.bombs].map(key));
     const cells:Cell[]=[];for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(!occupied.has(y*COLS+x))cells.push({x,y});
@@ -51,8 +52,21 @@ export class Engine {
       const body=this.snake.slice(0,this.growth||eating?undefined:-1);
       return !body.some(p=>key(p)===key(n))&&!this.bombs.some(p=>key(p)===key(n));
     });
+    const head=this.snake[0],neck=this.snake[1]??{x:head.x-1,y:head.y};
+    const dx=head.x-neck.x,dy=head.y-neck.y;
     let best:Cell|undefined,bestValue=-Infinity;
-    for(const n of candidates){const eating=this.food.some(f=>key(f)===key(n));const future=[n,...this.snake];if(!eating&&!this.growth)future.pop();const blocked=new Set([...future.slice(1),...this.bombs].map(key));const space=this.space(n,blocked);const value=space+(target&&key(n)===key(target)&&space>Math.min(this.snake.length+5,100)?1000:0);if(value>bestValue){bestValue=value;best=n;}}
+    for(const n of candidates){
+      const eating=this.food.some(f=>key(f)===key(n)),future=[n,...this.snake];if(!eating&&!this.growth)future.pop();
+      const blocked=new Set([...future.slice(1),...this.bombs].map(key)),space=this.space(n,blocked);
+      const safe=space>=Math.min(this.snake.length+5,100),toward=target&&key(n)===key(target),turn=n.x-head.x!==dx||n.y-head.y!==dy;
+      // Space remains the first priority. Among safe moves, commit to short runs
+      // of varying length and then seek a bend instead of repeating BFS strips.
+      const bend=this.movesSinceTurn>=this.turnAfter?(turn?34:0):(turn?0:17);
+      const visited=this.recent.includes(key(n))?45:0;
+      const chase=this.movesWithoutApple>=80?1500:19;
+      const value=(safe?10000:space*10)+space*.02+bend-visited+(toward?chase:0)+(eating?100:0)+this.random()*13;
+      if(value>bestValue){bestValue=value;best=n;}
+    }
     return best;
   }
   step(now:number){
@@ -66,9 +80,13 @@ export class Engine {
     let next=this.choose();
     if(!next&&this.active.G11){delete this.active.G11;this.bombs=[];this.snake=this.snake.slice(0,1);this.growth=0;this.lastExplosion=now;next=this.choose();}
     if(!next){this.triggerGameOver('NO SAFE PATH');return;}
+    const head=this.snake[0],neck=this.snake[1];
+    const turned=neck&&(next.x-head.x!==head.x-neck.x||next.y-head.y!==head.y-neck.y);
+    if(turned){this.movesSinceTurn=0;this.turnAfter=(this.difficulty==='hard'?1:2)+Math.floor(this.random()*4);}else this.movesSinceTurn++;
+    this.movesWithoutApple++;this.recent.push(key(head));if(this.recent.length>32)this.recent.shift();
     this.previous=this.snake.map(p=>({...p}));this.snake.unshift(next);
     const foodIndex=this.food.findIndex(f=>key(f)===key(next));
-    if(foodIndex>=0){const [f]=this.food.splice(foodIndex,1);this.score+=f.gold?50:10;this.apples++;this.lastEat=now;this.best=Math.max(this.best,this.score);}
+    if(foodIndex>=0){const [f]=this.food.splice(foodIndex,1);this.score+=f.gold?50:10;this.apples++;this.movesWithoutApple=0;this.lastEat=now;this.best=Math.max(this.best,this.score);}
     else if(this.growth>0)this.growth--;else this.snake.pop();
     if(!this.food.length)this.spawnApples(1);
     if(this.snake.length>=COLS*ROWS-1||this.score>=1000)this.triggerGameOver('ROUND COMPLETE');

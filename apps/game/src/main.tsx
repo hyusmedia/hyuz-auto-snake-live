@@ -2,30 +2,36 @@ import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {engine,runtime,connect,processGifts,save} from './runtime';
 import {draw} from './render';
+import {GameAudio} from './audio';
 import {effects,type EffectId} from '../../../packages/shared/gifts';
 import './style.css';
 function useTick(){const [,set]=useState(0);useEffect(()=>{const t=setInterval(()=>set(n=>n+1),250);return()=>clearInterval(t);},[]);}
 function Game(){
-  useTick();const canvas=useRef<HTMLCanvasElement>(null);const audio=useRef<AudioContext|null>(null);
+  useTick();const canvas=useRef<HTMLCanvasElement>(null);const audio=useRef<GameAudio|null>(null);
   const [video,setVideo]=useState('');const [muted,setMuted]=useState(true);const [loop,setLoop]=useState(true);const [videoHeight,setVideoHeight]=useState(130);
-  const [audioState,setAudioState]=useState('SOUND OFF');
+  const [audioState,setAudioState]=useState('ENABLE SOUND');
+  const enableSound=async()=>{try{audio.current??=new GameAudio();runtime.sound=await audio.current.enable();setAudioState(runtime.sound?'SOUND ON':'ENABLE SOUND');save();}catch{setAudioState('RETRY SOUND');}};
   useEffect(()=>{
     const disconnect=connect();let frame=0,lastStep=Date.now(),lastSave=Date.now(),fpsAt=performance.now(),frames=0,lastApple=engine.apples,lastRound=engine.round,lastGift=runtime.lastGift;
     const update=()=>{const now=Date.now();try{
       processGifts(now);
-      if(now-lastStep>=engine.interval){engine.step(now);lastStep=now;}
-      if(runtime.sound&&(engine.apples!==lastApple||engine.round!==lastRound||runtime.lastGift!==lastGift)){
-        if(audio.current?.state==='running'){const oscillator=audio.current.createOscillator(),gain=audio.current.createGain();oscillator.connect(gain);gain.connect(audio.current.destination);oscillator.frequency.value=runtime.lastGift!==lastGift?440+Object.keys(effects).findIndex(id=>runtime.lastGift.includes(effects[id as EffectId].name))*45:engine.round!==lastRound?260:660;gain.gain.setValueAtTime(.04,audio.current.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.current.currentTime+.12);oscillator.start();oscillator.stop(audio.current.currentTime+.12);}
+      if(now-lastStep>=engine.interval){
+        const head={...engine.snake[0]},neck=engine.snake[1]?{...engine.snake[1]}:null,round=engine.round;
+        engine.step(now);lastStep=now;
+        const next=engine.snake[0],moved=next.x!==head.x||next.y!==head.y;
+        if(runtime.sound&&round===engine.round&&moved&&neck&&(next.x-head.x!==head.x-neck.x||next.y-head.y!==head.y-neck.y))audio.current?.turn();
       }
+      if(runtime.sound){if(engine.apples>lastApple)audio.current?.apple();if(engine.round!==lastRound)audio.current?.round();if(runtime.lastGift!==lastGift)audio.current?.gift();}
       lastApple=engine.apples;lastRound=engine.round;lastGift=runtime.lastGift;
       if(now-lastSave>1000){save();lastSave=now;}
     }catch{runtime.recovery='Game error recovered with a fresh round';engine.reset();lastStep=now;}};
     const tick=setInterval(update,25);
     const render=()=>{const now=Date.now();try{if(canvas.current)draw(canvas.current,Math.min(1,(now-lastStep)/engine.interval),now);}catch{runtime.recovery='Renderer error; restarting round';engine.reset();}frames++;if(performance.now()-fpsAt>=1000){runtime.fps=Math.round(frames*1000/(performance.now()-fpsAt));frames=0;fpsAt=performance.now();}frame=requestAnimationFrame(render);};frame=requestAnimationFrame(render);
-    const persist=()=>save();window.addEventListener('pagehide',persist);return()=>{clearInterval(tick);cancelAnimationFrame(frame);disconnect();save();window.removeEventListener('pagehide',persist);};
+    const persist=()=>save();window.addEventListener('pagehide',persist);return()=>{clearInterval(tick);cancelAnimationFrame(frame);disconnect();audio.current?.dispose();save();window.removeEventListener('pagehide',persist);};
   },[]);
   useEffect(()=>()=>{if(video)URL.revokeObjectURL(video);},[video]);
   const active=Object.keys(engine.active) as EffectId[];
+  const soundLabel=runtime.sound&&audio.current?.running?'SOUND ON':audioState==='SOUND ON'?'ENABLE SOUND':audioState;
   const giftGuide=[
     {icon:'★',name:'STAR',effect:'CHANGE COLOR',detail:'SNAKE',tone:'star'},
     {icon:'🦴',name:'TREAT',effect:'APPLE RAIN',detail:'+5 APPLES',tone:'treat'},
@@ -49,8 +55,9 @@ function Game(){
     <section className="reference-board"><canvas ref={canvas} width={720} height={720} aria-label="Automatically playing spotted snake game"/></section>
     <div className="reference-score" aria-label="Current score">{engine.score}<span>=score</span></div>
     <section className="reserved-last-gift" aria-label="Reserved space for last gift sender"/>
+    <button className="audio-toggle" onClick={enableSound}>{soundLabel}</button>
     <div className="minimal-status"><span>HYUZ · DEMO · AUTOPLAY {engine.paused||!engine.autoplay?'PAUSED':'ON'}</span><span className={runtime.connected?'online':'offline'}>{runtime.connected?'DEMO SERVER ONLINE':'GIFT CONNECTION OFFLINE'}</span><span>{runtime.fps} FPS{active.length?' · '+active.map(id=>effects[id].name).join(' / '):''}</span>{runtime.recovery&&<span className="warning">{runtime.recovery}</span>}</div>
-    {location.pathname!=='/overlay'&&<details className="screen-options"><summary>Screen settings</summary><button onClick={async()=>{audio.current??=new AudioContext();await audio.current.resume();runtime.sound=audio.current.state==='running';setAudioState(runtime.sound?'SOUND ON':'SOUND BLOCKED');save();}}>{audioState}</button><label>Recorded MP4<input type="file" accept="video/mp4" onChange={e=>{const f=e.target.files?.[0];if(f)setVideo(URL.createObjectURL(f));}}/></label><button onClick={()=>setVideo('')}>Clear person area</button><label><input type="checkbox" checked={muted} onChange={e=>setMuted(e.target.checked)}/>Muted</label><label><input type="checkbox" checked={loop} onChange={e=>setLoop(e.target.checked)}/>Loop</label><label>Video height<input type="range" min="80" max="150" value={videoHeight} onChange={e=>setVideoHeight(Number(e.target.value))}/></label></details>}
+    {location.pathname!=='/overlay'&&<details className="screen-options"><summary>Screen settings</summary><button onClick={enableSound}>{soundLabel}</button><label>Recorded MP4<input type="file" accept="video/mp4" onChange={e=>{const f=e.target.files?.[0];if(f)setVideo(URL.createObjectURL(f));}}/></label><button onClick={()=>setVideo('')}>Clear person area</button><label><input type="checkbox" checked={muted} onChange={e=>setMuted(e.target.checked)}/>Muted</label><label><input type="checkbox" checked={loop} onChange={e=>setLoop(e.target.checked)}/>Loop</label><label>Video height<input type="range" min="80" max="150" value={videoHeight} onChange={e=>setVideoHeight(Number(e.target.value))}/></label></details>}
   </main>;
 
 }

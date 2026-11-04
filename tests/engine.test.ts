@@ -11,6 +11,15 @@ test('Phase 1: 30 simulated minutes of autonomous play, food, scoring and repeat
 });
 test('round game over restarts at 2.5s without touching pause or best score',()=>{const e=new Engine();e.now=1000;e.score=40;e.triggerGameOver();e.step(3499);assert.equal(e.round,1);e.step(3500);assert.equal(e.round,2);assert.equal(e.best,40);assert.equal(e.score,0);});
 test('growth keeps tail occupied; AI never chooses a colliding cell',()=>{const e=new Engine();e.growth=5;const n=e.choose();assert(n);assert(!e.snake.some(p=>key(p)===key(n)));});
+test('maze steering makes varied bends while still reaching apples without collisions',()=>{
+  const e=new Engine(seeded());e.food=[{x:18,y:13,gold:false}];let turns=0,eaten=0,lastApples=0;
+  for(let i=0;i<400;i++){
+    const h={...e.snake[0]},neck={...e.snake[1]},round=e.round;e.step(1000+i*125);valid(e);
+    const n=e.snake[0];if(round===e.round&&(n.x!==h.x||n.y!==h.y)&&(n.x-h.x!==h.x-neck.x||n.y-h.y!==h.y-neck.y))turns++;
+    if(e.apples>lastApples)eaten+=e.apples-lastApples;lastApples=e.apples;
+  }
+  assert(turns>=50,`Expected winding movement, got ${turns} turns`);assert(eaten>=2,`Expected food progress, got ${eaten}`);
+});
 test('all 12 effects execute, timers expire, speed precedence restores normal play',()=>{
   for(const id of Object.keys(effects) as EffectId[]){const e=new Engine(seeded());e.now=100;e.apply(id);valid(e);if(id==='G10')assert(e.restartAt);e.step(20000);e.step(20125);valid(e);assert(!e.active[id]);}
   const e=new Engine();e.activateTurbo(10000);const turbo=e.interval;e.activateSlowMotion(10000);assert(e.interval>turbo);assert(!e.active.G03);e.step(11000);assert.equal(e.interval,125);

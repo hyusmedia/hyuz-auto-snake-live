@@ -13,7 +13,8 @@
     "test": "tsx --test tests/*.test.ts",
     "test:browser": "tsx scripts/browser-smoke.ts",
     "test:soak": "tsx scripts/soak.ts",
-    "test:restart": "tsx scripts/restart-smoke.ts"
+    "test:restart": "tsx scripts/restart-smoke.ts",
+    "test:audio": "tsx scripts/audio-smoke.ts"
   },
   "dependencies": {
     "react": "^19.2.0",

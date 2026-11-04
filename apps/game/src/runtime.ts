@@ -4,7 +4,7 @@ export const engine=new Engine();
 export const runtime={connected:false,epoch:'',cursor:0,inbox:[] as GiftAction[],notice:'',noticeUntil:0,lastGift:'Waiting for a demo gift',notifications:true,sound:false,fps:0,recovery:'',started:Date.now(),video:''};
 const notices:string[]=[];
 const storageKey='hyuz-snake-v1';
-const stateFields=['snake','previous','food','bombs','score','best','round','apples','growth','color','now','restartAt','reason','paused','autoplay','speed','difficulty','active','pending','lastEat','lastExplosion'] as const;
+const stateFields=['snake','previous','food','bombs','score','best','round','apples','growth','color','now','restartAt','reason','paused','autoplay','speed','difficulty','active','pending','lastEat','lastExplosion','movesSinceTurn','turnAfter','movesWithoutApple','recent'] as const;
 export function save(){try{localStorage.setItem(storageKey,JSON.stringify({version:1,game:Object.fromEntries(stateFields.map(k=>[k,engine[k]])),epoch:runtime.epoch,cursor:runtime.cursor,inbox:runtime.inbox,lastGift:runtime.lastGift,sound:runtime.sound,notifications:runtime.notifications}));}catch{runtime.recovery='Storage unavailable: refresh recovery disabled';}}
 try{
   const raw=localStorage.getItem(storageKey);
@@ -14,6 +14,8 @@ try{
     if(['score','best','round','apples','growth','speed','now','restartAt','lastEat','lastExplosion'].some(k=>!Number.isFinite(g[k]))||g.speed<2||g.speed>20||g.growth<0||g.growth>60)throw Error('Invalid snapshot counters');
     if(typeof g.paused!=='boolean'||typeof g.autoplay!=='boolean'||typeof g.color!=='string'||!g.active||typeof g.active!=='object'||!Array.isArray(g.pending)||g.pending.length>128||g.pending.some((id:unknown)=>!isEffect(id)))throw Error('Invalid snapshot effects');
     if(Object.entries(g.active).some(([id,until])=>!isEffect(id)||!Number.isFinite(until)))throw Error('Invalid effect timers');
+    for(const name of ['movesSinceTurn','turnAfter','movesWithoutApple'])if(Object.hasOwn(g,name)&&(!Number.isSafeInteger(g[name])||g[name]<0))throw Error('Invalid steering counters');
+    if(Object.hasOwn(g,'recent')&&(!Array.isArray(g.recent)||g.recent.length>32||g.recent.some((k:unknown)=>!Number.isInteger(k)||Number(k)<0||Number(k)>=COLS*ROWS)))throw Error('Invalid steering history');
     for(const k of stateFields)if(Object.hasOwn(g,k))Object.assign(engine,{[k]:g[k]});
     runtime.epoch=String(s.epoch);runtime.cursor=Number(s.cursor)||0;runtime.inbox=s.inbox.filter((a:GiftAction)=>isEffect(a.effect)&&Number.isInteger(a.count)&&a.count>0&&a.count<=100);runtime.lastGift=String(s.lastGift??runtime.lastGift);runtime.sound=s.sound===true;runtime.notifications=s.notifications!==false;
   }
